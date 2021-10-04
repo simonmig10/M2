@@ -1,0 +1,8 @@
+---
+title: "Assigment 1 Netværk"
+author: "Simon"
+date: "4/10/2021"
+output: html_document
+---
+
+
