@@ -6,4 +6,68 @@ output: html_document
 ---
 
 
-hej 
+```{r}
+library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
+library(magrittr) # For extra-piping operators (eg. %<>%)'
+library(threejs)
+```
+
+```{r}
+attr <- read_csv('https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-Attributes.csv') 
+
+edge_ad = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-edgelist-Advice.txt")
+
+edge_f = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-edgelist-Friendship.txt")
+
+edge_r = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-edgelist-ReportsTo.txt")
+
+```
+## Cleaning and EDA
+
+```{r}
+attr %>%  head()
+
+attr %>% glimpse()
+```
+
+#1. Create a network:
+
+Networks are created using igraph
+```{r}
+net_ad = graph_from_data_frame(d = edge_ad, vertices = attr, directed = T)
+```
+
+```{r}
+net_f = graph_from_data_frame(d = edge_f, vertices = attr, directed = T)
+```
+
+```{r}
+net_r = graph_from_data_frame(d = edge_r, vertices = attr, directed = T)
+```
+
+#2. Analysis
+
+## A: Network level characteristics. Find the overal network level of
+
+```{r}
+transitivity(net_ad, type = "global")
+transitivity(net_f, type = "global")
+transitivity(net_r, type = "global")
+
+edge_density(net_ad)
+edge_density(net_f)
+edge_density(net_r)
+
+reciprocity(net_ad)
+reciprocity(net_f)
+reciprocity(net_r)
+```
+
+```{r}
+plot(net_ad)
+
+g <- set_vertex_attr(net_ad, "color", value = "dodgerblue")
+graphjs(g)
+```
+
+
