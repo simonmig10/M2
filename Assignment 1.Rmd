@@ -10,6 +10,8 @@ output: html_document
 library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
 library(magrittr) # For extra-piping operators (eg. %<>%)'
 library(threejs)
+library(tidygraph)
+library(ggraph)
 ```
 
 ```{r}
@@ -21,6 +23,7 @@ edge_f = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master
 
 edge_r = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-edgelist-ReportsTo.txt")
 
+
 ```
 ## Cleaning and EDA
 
@@ -28,6 +31,35 @@ edge_r = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master
 attr %>%  head()
 
 attr %>% glimpse()
+```
+Filtering for true observations in our edgelist.
+```{r}
+edge_ad <- edge_ad %>%
+  filter(V3 == 1) %>%
+  select(!V3)
+
+edge_f <- edge_f %>%
+  filter(V3 == 1) %>%
+  select(!V3)
+
+edge_r <- edge_r %>%
+  filter(V3 == 1) %>%
+  select(!V3)
+```
+
+Attaching node characteristics from the corresponding nodelist
+```{r}
+joined_ad = edge_ad %>% 
+  rename(ID = V1) %>% 
+    left_join(attr, by = "ID")
+
+joined_f = edge_f %>% 
+  rename(ID = V1) %>% 
+    left_join(attr, by = "ID")
+
+joined_r = edge_r %>% 
+  rename(ID = V1) %>% 
+    left_join(attr, by = "ID")
 ```
 
 #1. Create a network:
@@ -47,22 +79,110 @@ net_r = graph_from_data_frame(d = edge_r, vertices = attr, directed = T)
 
 #2. Analysis
 
-## A: Network level characteristics. Find the overal network level of
+## A: Network level characteristics.
 
+Network of advices:
 ```{r}
 transitivity(net_ad, type = "global")
-transitivity(net_f, type = "global")
-transitivity(net_r, type = "global")
 
 edge_density(net_ad)
-edge_density(net_f)
-edge_density(net_r)
 
 reciprocity(net_ad)
+```
+Transitivity, also called the Clustering Coefficient indicates how much the network tends to be locally clustered. 
+That is measured by the share of closed triplets. An example would be that A gives B and C an advice, then if either B or C gives each other advice we have a closed triplet. In this case the transitivity is high, which indicates a large a mount of local clusters.
+   The index of network density is simply defined as the ratio of observed edges to the number of possible edges for a given network. A edge density of 0.45 means that this network has 45% of the total possible edges(possible relationships).
+   Reciprocity is a measure of the likelihood of vertices/nodes in a directed network to be mutually linked. An example could be, that A gives advice to B and B gives advice to A. A reciprocity index of 0.47 means that when A gives advice to B it is only reciprocated 47% of the time.
+
+```{r}
+
+transitivity(net_f, type = "global")
+
+edge_density(net_f)
+
 reciprocity(net_f)
+```
+We see that the friendship network has a much lower transitivity and density index than the advice network. The lower transitivity index of 0.47 means less local clusters in the friendship network than the advice network, which means that coworkers are more likely to be in a advice-seeking relationship than in a friendships. This is also implied by the density index of 0.24, which is likewise lower than in the advice network.
+   Friendships are more or less as reciprocal as advice-seeking relationships.  
+
+
+```{r}
+
+transitivity(net_r, type = "global")
+
+edge_density(net_r)
+
+
 reciprocity(net_r)
 ```
+The transitivity and reciprocity index of the "responds to" network are 0, which makes a lot of sense given that A's superior B, cant also respond to A, likewise A and C's superior cant also respond to either A or B.  
 
+# B: Node level characteristics: Likewise, find out:
+## Who is most popular in the networks. Who is the most wanted friend, and advice giver?
+```{r}
+joined_f %>% 
+  count(ID, sort = T) %>% 
+  head(1)
+
+joined_ad %>% 
+  count(ID, sort = T) %>% 
+  head(1)
+```
+We see that the most wanted friend is person with ID number 17 and the most wanted advice giver is person with muber ID 15.
+
+Who are these people?????
+```{r}
+attr %>% 
+  filter(ID %in% c(15, 17))
+
+```
+We see that they are both managers in department 2 and 1, they are 30 and 40 years of age, and have tenured for 8.4 and 12.4 years respectively.
+
+## Are managers in higher hierarchy more popular as friend, and advice giver?
+
+```{r}
+joined_f %>% 
+  group_by(LEVEL) %>% 
+  count(ID) %>% 
+  summarise(mean(n))
+
+joined_ad %>% 
+  group_by(LEVEL) %>% 
+  count(ID) %>% 
+  summarise(mean(n))
+```
+This shows that managers in higher hierarchy are less popular as friends, and advice givers.
+
+# C: Relational Characteristics: Answer the following questions:
+## Are managers from the same 1. department, or on the same 2. hirarchy, 3. age, or 4. tenuere more likely to become friends or give advice? (hint: assortiativity related)
+
+```{r}
+assortativity(net_ad, attr$DEPT)
+assortativity(net_f, attr$DEPT)
+assortativity(net_r, attr$DEPT)
+```
+
+```{r}
+assortativity(net_ad, attr$LEVEL)
+assortativity(net_f, attr$LEVEL)
+assortativity(net_r, attr$LEVEL)
+```
+
+```{r}
+assortativity(net_ad, attr$AGE)
+assortativity(net_f, attr$AGE)
+assortativity(net_r, attr$AGE)
+```
+
+```{r}
+assortativity(net_ad, attr$TENURE)
+assortativity(net_f, attr$TENURE)
+assortativity(net_r, attr$TENURE)
+
+```
+
+
+# 3. Visualization
 ```{r}
 plot(net_ad)
 
@@ -70,4 +190,4 @@ g <- set_vertex_attr(net_ad, "color", value = "dodgerblue")
 graphjs(g)
 ```
 
-
+Tak for i dag, du tager over her Simon, vi arbejdede helt til 20:00, så vi er trætte nu.
