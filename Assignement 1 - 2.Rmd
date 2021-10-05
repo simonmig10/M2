@@ -1,0 +1,333 @@
+---
+title: "Assignment 1- 2"
+author: "Simon"
+date: "5/10/2021"
+output: html_document
+---
+
+
+```{r}
+library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
+library(magrittr) # For extra-piping operators (eg. %<>%)'
+library(threejs)
+library(tidygraph)
+library(ggraph)
+```
+
+```{r}
+attr <- read_csv('https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-Attributes.csv') 
+
+edge_ad = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-edgelist-Advice.txt")
+
+edge_f = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-edgelist-Friendship.txt")
+
+edge_r = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-edgelist-ReportsTo.txt")
+
+
+```
+# Cleaning and EDA
+
+```{r}
+attr %>%  head()
+
+attr %>% glimpse()
+```
+
+
+We know the following: 
+
+- **ID**: Numeric ID of the manager
+- **AGE**: The managers age (in years)
+- **TENURE**: The length of service or tenure (in years)
+- **LEVEL**: The level in the corporate hierarchy (coded 1,2 and 3; 1 = CEO, 2 = Vice President, 3 = manager)
+- **DEPT**: The department (coded 1,2,3,4 with the CEO in department 0, ie not in a department)
+
+So we will transform the **LEVEL** column so we have strings. 
+
+```{r}
+##attr %<>%
+  ##mutate(LEVEL = recode(LEVEL, "1" = "CEO", "2" = "Vice President", "3" = "Manager"))
+
+```
+
+(Hvis vi køre koden over virker assortiativity for "LEVEL" ik)
+
+# Create a network: 
+
+Networks are created using igraph
+```{r}
+net_ad = graph_from_data_frame(d = edge_ad, vertices = attr, directed = T)
+tg_net_ad= tbl_graph(edges = edge_ad, nodes = attr, directed = T)
+```
+
+```{r}
+net_f = graph_from_data_frame(d = edge_f, vertices = attr, directed = T)
+tg_net_f= tbl_graph(edges = edge_f, nodes = attr, directed = T)
+```
+
+```{r}
+net_r = graph_from_data_frame(d = edge_r, vertices = attr, directed = T)
+tg_net_r= tbl_graph(edges = edge_r, nodes = attr, directed = T)
+```
+
+
+# Analysis
+
+Filtering for true observations in our edgelist.
+```{r}
+g_ad <- tg_net_ad %E>%
+  filter(V3 == 1) %E>%
+  select(!V3)
+
+g_f <- tg_net_f %E>%
+  filter(V3 == 1) %E>%
+  select(!V3)
+
+g_r <- tg_net_r %E>%
+  filter(V3 == 1) %E>%
+  select(!V3)
+```
+
+## A
+
+**Network level characteristics. Find the overal network level of:**
+
+**Density**
+
+```{r}
+edge_density(g_ad)
+
+edge_density(g_f)
+
+edge_density(g_r)
+```
+
+
+**Transitivity**
+
+```{r}
+transitivity(g_ad, type = "global")
+
+transitivity(g_f, type = "global")
+
+transitivity(g_r, type = "global")
+```
+
+
+**Resciprocity**
+
+```{r}
+reciprocity(g_ad)
+
+reciprocity(g_f)
+
+reciprocity(g_r)
+```
+
+## B Node level characteristics: Likewise, find out:
+
+
+
+### 1. Who is most popular in the networks. Who is the most wanted friend, and advice giver?
+
+We can find out who is the most important in the network by calculating the centrality in the networks.
+We first calculate different centrality measures:
+```{r}
+
+## Advice
+g_ad_cent <- g_ad %N>%
+  mutate(cent_dgr_in = centrality_degree(mode = "in"),
+         cent_dgr_out = centrality_degree(mode = "out"),
+         cent_eig= centrality_eigen(directed = T),
+         cent_between = centrality_betweenness(directed = T))
+
+## Friends
+g_f_cent <- g_f %N>%
+  mutate(cent_dgr_in = centrality_degree(mode = "in"),
+         cent_dgr_out = centrality_degree(mode = "out"),
+         cent_eig= centrality_eigen(directed = T),
+         cent_between = centrality_betweenness(directed = T))
+
+```
+
+#### Centrality degree
+
+**Most central Advicer**
+
+```{r}
+
+## For "in"
+g_ad_cent %N>%
+  arrange(desc(cent_dgr_in))
+
+```
+We can see note two is the person with the largest Centrality when looking at people seeking him for advice. 
+
+**Most central Friend**
+
+```{r}
+
+## For "in"
+
+g_f_cent %N>%
+  arrange(desc(cent_dgr_in))
+
+```
+Again we see ID 2 being the most central person when it comes to people seeing him as a friend. 
+
+
+#### Centrality eigenvalue
+
+**Most central Advicer**
+
+```{r}
+g_ad_cent %N>%
+  arrange(desc(cent_eig))
+
+```
+Again we reach same conclusion
+
+**Most central Friend**
+
+```{r}
+
+g_f_cent %N>%
+  arrange(desc(cent_eig))
+
+```
+Again ID 2
+
+#### Centrality betweeness
+
+**Most central Advicer**
+
+```{r}
+g_ad_cent %N>%
+  arrange(desc(cent_between))
+
+```
+ID 18 seems to be the most "central"
+
+**Most central Friend**
+
+```{r}
+
+g_f_cent %N>%
+  arrange(desc(cent_between))
+
+```
+ID 17 seems to be most central friend here. 
+
+
+#### 2. Are managers in higher hirarchy more popular as friend, and advice giver?
+
+We can look at the mean centrality score for each *LEVEL*:
+
+**Betweeness**
+
+```{r}
+
+##Advice
+g_ad_cent %N>%
+  as_tibble() %>%
+  group_by(LEVEL)%>%
+  summarise(mean_between= mean(cent_between))
+
+```
+```{r}
+
+##Friends
+g_f_cent %N>%
+  as_tibble() %>%
+  group_by(LEVEL)%>%
+  summarise(mean_between= mean(cent_between))
+
+```
+
+**Eigenvalue**
+
+```{r}
+g_ad_cent %N>%
+  as_tibble() %>%
+  group_by(LEVEL)%>%
+  summarise(mean_eig= mean(cent_eig))
+
+```
+
+
+```{r}
+g_f_cent %N>%
+  as_tibble() %>%
+  group_by(LEVEL)%>%
+  summarise(mean_eig= mean(cent_eig))
+
+```
+Seems like overall Vice precidents seems to be the people that gets asked the most for advice, and seen as friends. 
+
+## C Relational Characteristics: Answer the following questions:
+
+#### Are managers from the same 1. department, or on the same 2. hirarchy, 3. age, or 4. tenuere more likely to become friends or give advice? (hint: assortiativity related)
+
+**Are managers from the same department likely to become friends or give advice?**
+
+```{r}
+##Advice
+assortativity(g_ad, V(g_ad)$DEPT, directed = TRUE)
+```
+Not that high
+
+```{r}
+##Friends
+assortativity(g_f, V(g_f)$DEPT, directed = TRUE)
+```
+
+**Are managers from the same hirarchy likely to become friends or give advice?**
+
+```{r}
+##Advice
+assortativity(g_ad, V(g_ad)$LEVEL, directed = TRUE)
+```
+Not that high
+
+```{r}
+##Friends
+assortativity(g_f, V(g_f)$LEVEL, directed = TRUE)
+```
+**Are managers from the same age likely to become friends or give advice?**
+
+```{r}
+##Advice
+assortativity(g_ad, V(g_ad)$AGE, directed = TRUE)
+```
+Not that high
+
+```{r}
+##Friends
+assortativity(g_f, V(g_f)$AGE, directed = TRUE)
+```
+**Are managers from the same tenuere likely to become friends or give advice?**
+
+```{r}
+##Advice
+assortativity(g_ad, V(g_ad)$TENURE, directed = TRUE)
+```
+Not that high
+
+```{r}
+##Friends
+assortativity(g_f, V(g_f)$TENURE, directed = TRUE)
+```
+Damn its negative!
+
+
+#### Are friends more likely to give each others advice?
+
+idk
+
+# Visualizations
+
+We can visualizies all the networks at once: 
+
+
+
+
