@@ -322,12 +322,127 @@ Damn its negative!
 
 #### Are friends more likely to give each others advice?
 
-idk
+
+```{r}
+cor(edge_ad %>% pull(V3), 
+    edge_f %>% pull(V3))
+```
+
+
+```{r}
+graph.friendship_V2 <- g_f %E>% mutate(friends = which_mutual(g_f, es = E(g_f))) 
+
+graph.friendship_V2 %E>% as.tibble() %>% count(friends)
+```
+
+
+```{r}
+graph <- graph.friendship_V2 %E>% as_tibble() %>%
+  left_join((g_ad %E>% as_tibble()), by = "from")%>%
+  rename(to_friends= to.x, to_advice= to.y)
+```
+
+
+
+```{r}
+
+## Not friends who gives advice to each other
+
+graph_nf= graph %>%
+filter(friends == F) %>%
+  filter(to_friends == to_advice) %>%glimpse(width = 80) 
+
+## Friends who gives advice to each other
+
+graph_f = graph %>%
+filter(friends == TRUE) %>%
+  filter(to_friends == to_advice) %>%glimpse(width = 80) 
+
+```
+
+
+```{r}
+
+#Number of friends who gives advice
+f=count(graph_f)
+
+#Numbber of not friends who gives advice
+nf=count(graph_nf)
+```
+
+```{r}
+#number of  people who are mutual friends 
+total_f=graph.friendship_V2 %E>%
+  as_tibble()%>%
+  filter(friends == TRUE) %>%
+  count()
+
+# Number of people who are not mutual friends
+
+total_nf=graph.friendship_V2 %E>%
+  as_tibble()%>%
+  filter(friends == F) %>%
+  count()
+```
+
+```{r}
+f/total_f*100
+
+nf/total_nf*100
+```
+We take the amount of mutual friends, so if ID 1 sees ID 2 as a friend and ID 2 sees ID 1 as friend. (This will count as 2 observations) We then look if people who are mutual friends also give advice to eacch other, if ID 1 gives advice to ID 2 this will give 1 observation, and vice versa. (So not mutualy).
+
+We then calculate the percantage of people who gives advice in a friendsship and outside a friendship. We see that it is almost the same so people who are friends are not more likely to give each others advice.
 
 # Visualizations
 
-We can visualizies all the networks at once: 
+We join the graphs
+
+```{r}
+
+g_ad = g_ad %E>% mutate(type= "advice")
+g_f = g_f %E>% mutate(type= "friends")
+g_r = g_r %E>% mutate(type= "respons")
+
+# We could also join all the networks together.
+g_all <- g_ad %>%
+  graph_join(g_f, by = "ID") %>%
+  graph_join(g_r, by = "ID")
+```
 
 
+```{r}
+# Then we could plot them pointly via an edge facett...
+g_all %>% 
+  ggraph(layout = 'fr') + 
+  geom_edge_fan(aes(col = type), ##The fan does so the edges will not overlay each other
+                arrow = arrow(angle = 30, length = unit(0.25, 'cm'),type = "closed"), 
+                alpha = 0.25) + 
+  geom_node_point(col = 'pink') +
+  geom_node_text(aes(label = ID)) + 
+  theme_graph() +
+  theme(legend.position = "none") +
+  facet_edges(~type) ## Without the facet_edges we get one large plot where we can see the edges has different colors.
+```
+
+
+```{r}
+g_f= g_f %N>% mutate(LEVEL = recode(LEVEL, "1" = "CEO", "2" = "Vice President", "3" = "Manager"))
+```
+
+
+```{r, fig.height= 7.5, fig.width=12.5}
+set.seed(1337)
+# Then we could plot them pointly via an edge facett...
+g_f %N>% 
+  filter(!node_is_isolated()) %>%
+  ggraph(layout = 'stress') + 
+  geom_edge_fan(arrow = arrow(angle = 30, length = unit(0.25, 'cm'),type = 'closed'), alpha = 0.25) + 
+  geom_node_point(aes(col = LEVEL, size = centrality_eigen(directed = TRUE))) + ##WE color by different offices
+  geom_node_text(aes(label = ID, size = centrality_eigen(directed = TRUE))) + 
+  theme_graph() +
+  theme(legend.position = "bottom") +
+  facet_edges(~type)
+```
 
 
