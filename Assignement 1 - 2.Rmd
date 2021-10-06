@@ -2,7 +2,10 @@
 title: "Assignment 1- 2"
 author: "Simon"
 date: "5/10/2021"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
+always_allow_html: true
 ---
 
 
@@ -433,7 +436,7 @@ g_all <- g_ad %>%
 ```
 We can now plot all the 3 networks in the same plot. but we use "facet_edges" to sepererate the network via the type variable we created above. 
 
-```{r}
+```{r ,fig.height= 7.5, fig.width=12.5}
 g_all %>% 
   ggraph(layout = 'fr') + 
   geom_edge_fan(aes(col = type), 
@@ -441,7 +444,7 @@ g_all %>%
                 alpha = 0.25) + 
   geom_node_point(col = 'pink') +
   geom_node_text(aes(label = ID)) + 
-  theme_graph() +
+  theme_graph(base_family="sans") +
   theme(legend.position = "none") +
   facet_edges(~type) 
 ```
@@ -465,7 +468,7 @@ g_f %N>%
   geom_edge_fan(arrow = arrow(angle = 30, length = unit(0.25, 'cm'),type = 'closed'), alpha = 0.25) + 
   geom_node_point(aes(col = LEVEL, size = centrality_eigen(directed = TRUE))) + 
   geom_node_text(aes(label = ID, size = centrality_eigen(directed = TRUE))) + 
-  theme_graph() +
+  theme_graph(base_family="sans") +
   theme(legend.position = "bottom") +
   facet_edges(~type)
 ```
@@ -480,7 +483,7 @@ g_ad %N>%
   geom_edge_fan(arrow = arrow(angle = 30, length = unit(0.25, 'cm'),type = 'closed'), alpha = 0.25) + 
   geom_node_point(aes(col = LEVEL, size = centrality_eigen(directed = TRUE))) + 
   geom_node_text(aes(label = ID, size = centrality_eigen(directed = TRUE))) + 
-  theme_graph() +
+  theme_graph(base_family="sans") +
   theme(legend.position = "bottom") +
   facet_edges(~type)
 ```
