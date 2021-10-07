@@ -503,6 +503,8 @@ g_ad %N>%
 
 We can also do a 3D plot using the threejs package. Only able to see it when knitting to HTML but looks cool anyways
 
+[linked phrase](file:///C:/Users/Simon%20ik%20mig/Desktop/Social%20data%20science/Github/M2/Assignement-1---2.html) 
+
 ```{r, click=list}
 
 size_vector=g_f_cent %N>% as.tibble()
@@ -516,3 +518,5 @@ graphjs(g_f_cent, vertex.size = Size  , vertex.color= size_vector$LEVEL,
 ```
 
 We can see that the nodes are colored by the LEVEL variable in the network. 
+
+
