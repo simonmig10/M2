@@ -9,7 +9,7 @@ always_allow_html: true
 ---
 
 
-```{r}
+```{r, message=F}
 library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
 library(magrittr) # For extra-piping operators (eg. %<>%)'
 library(threejs)
