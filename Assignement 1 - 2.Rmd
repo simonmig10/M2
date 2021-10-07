@@ -17,7 +17,7 @@ library(tidygraph)
 library(ggraph)
 ```
 
-```{r}
+```{r, message=FALSE}
 attr <- read_csv('https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-Attributes.csv') 
 
 edge_ad = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master/00_data/network_krackhard/Krack-High-Tec-edgelist-Advice.txt")
@@ -28,8 +28,9 @@ edge_r = read.table("https://raw.githubusercontent.com/SDS-AAU/SDS-master/master
 
 
 ```
-# Cleaning and EDA
+# Cleaning
 
+We show the data
 ```{r}
 attr %>%  head()
 
@@ -45,19 +46,9 @@ We know the following:
 - **LEVEL**: The level in the corporate hierarchy (coded 1,2 and 3; 1 = CEO, 2 = Vice President, 3 = manager)
 - **DEPT**: The department (coded 1,2,3,4 with the CEO in department 0, ie not in a department)
 
-So we will transform the **LEVEL** column so we have strings. 
-
-```{r}
-##attr %<>%
-  ##mutate(LEVEL = recode(LEVEL, "1" = "CEO", "2" = "Vice President", "3" = "Manager"))
-
-```
-
-(Hvis vi køre koden over virker assortiativity for "LEVEL" ik)
-
 # Create a network: 
 
-Networks are created using igraph
+Networks are created using igraph. We create a graph and a table graph for the three networks. We set the "directed" option equal to true.
 ```{r}
 net_ad = graph_from_data_frame(d = edge_ad, vertices = attr, directed = T)
 tg_net_ad= tbl_graph(edges = edge_ad, nodes = attr, directed = T)
@@ -76,7 +67,7 @@ tg_net_r= tbl_graph(edges = edge_r, nodes = attr, directed = T)
 
 # Analysis
 
-Filtering for true observations in our edgelist.
+Filtering for true observations in our edgelist because we only want the observations where there is an edge. We use the filter to set the V3 column equal to 1.
 ```{r}
 g_ad <- tg_net_ad %E>%
   filter(V3 == 1) %E>%
@@ -93,50 +84,50 @@ g_r <- tg_net_r %E>%
 
 ## A
 
-**Network level characteristics. Find the overal network level of Density, Transitivity and Resciprocity:**
+**Network level characteristics. Find the overal network level of Density, Transitivity and Reciprocity:**
 
 **Advice**
 
 ```{r}
-edge_density(g_ad)
-
 transitivity(g_ad, type = "global")
+
+edge_density(g_ad)
 
 reciprocity(g_ad)
 
 ```
 Transitivity, also called the Clustering Coefficient indicates how much the network tends to be locally clustered. 
-That is measured by the share of closed triplets. An example would be that A gives B and C an advice, then if either B or C gives each other advice we have a closed triplet. In this case the transitivity is high, which indicates a large a mount of local clusters.
-   The index of network density is simply defined as the ratio of observed edges to the number of possible edges for a given network. A edge density of 0.45 means that this network has 45% of the total possible edges(possible relationships).
+That is measured by the share of closed triplets. An example would be that A gives B and C an advice, then if either B or C gives each other advice we have a closed triplet. In this case the transitivity is high (0.73), which indicates a large a mount of local clusters.
+   The index of network density is simply defined as the ratio of observed edges to the number of possible edges for a given network. An edge density of 0.45 means that this network has 45% of the total possible edges (possible relationships).
    Reciprocity is a measure of the likelihood of vertices/nodes in a directed network to be mutually linked. An example could be, that A gives advice to B and B gives advice to A. A reciprocity index of 0.47 means that when A gives advice to B it is only reciprocated 47% of the time.
 
 **Friends**
 
 ```{r}
-edge_density(g_f)
-
 transitivity(g_f, type = "global")
+
+edge_density(g_f)
 
 reciprocity(g_f)
 
 ```
 
 We see that the friendship network has a much lower transitivity and density index than the advice network. The lower transitivity index of 0.47 means less local clusters in the friendship network than the advice network, which means that coworkers are more likely to be in a advice-seeking relationship than in a friendships. This is also implied by the density index of 0.24, which is likewise lower than in the advice network.
-   Friendships are more or less as reciprocal as advice-seeking relationships. 
+   Friendships are more or less as reciprocal as advice-seeking relationships (0.45). 
    
 **Responds**
 
 ```{r}
-edge_density(g_r)
-
 transitivity(g_r, type = "global")
+
+edge_density(g_r)
 
 reciprocity(g_r)
 ```
-The transitivity and reciprocity index of the "responds to" network are 0, which makes a lot of sense given that A's superior B, cant also respond to A, likewise A and C's superior cant also respond to either A or B. 
+The transitivity and reciprocity index of the "responds to" network are 0, which makes a lot of sense given that A's superior B, cant also respond to A, likewise A and C's superior cant also respond to either A or B.
+We see that the density is equal to 0.05, given the hierarchy structure of a work place.
 
-## B Node level characteristics: Likewise, find out:
-
+## B. Node level characteristics: Likewise, find out:
 
 
 ### 1. Who is most popular in the networks. Who is the most wanted friend, and advice giver?
@@ -172,7 +163,7 @@ g_ad_cent %N>%
   arrange(desc(cent_dgr_in))
 
 ```
-We can see note with ID 2 is the person with the largest Centrality degree ("in") when looking at people seeking him for advice. 
+We can see that the note with ID 2 is the person with the largest Centrality degree ("in") when looking at people seeking him for advice. 
 
 **Most central Friend**
 
@@ -189,7 +180,7 @@ Again we see ID 2 being the most central person when it comes to people seeing h
 
 #### Centrality eigenvalue
 
-**Most central Advicer**
+**Most central Advisor**
 
 ```{r}
 g_ad_cent %N>%
@@ -208,16 +199,16 @@ g_f_cent %N>%
 ```
 Again same conclusion using centrality_eigenvalue
 
-#### Centrality betweeness
+#### Centrality betweenness
 
-**Most central Advicer**
+**Most central Advisor**
 
 ```{r}
 g_ad_cent %N>%
   arrange(desc(cent_between))
 
 ```
-Using centrality betweensess we get that ID 18 is the most central Advicer.
+Using centrality betweenness we get that ID 18 is the most central Advisor. This one looks at how many times the node is crossed when taking the shortest path from two nodes.
 
 **Most central Friend**
 
@@ -227,14 +218,14 @@ g_f_cent %N>%
   arrange(desc(cent_between))
 
 ```
-Using centrality betweensess we get that ID 17 is the most central friend.
+Using centrality betweenness we get that ID 17 is the most central friend.
 
 
 #### 2. Are managers in higher hirarchy more popular as friend, and advice giver?
 
 We can look at the mean centrality score for each *LEVEL*:
 
-**Betweeness**
+**Betweenness**
 
 ```{r}
 
@@ -278,13 +269,34 @@ g_f_cent %N>%
   summarise(mean_eig= mean(cent_eig))
 
 ```
-This time we get that vice presidents are the most central friends on average. 
+This time we get that vice presidents are the most central friends on average.
 
+**Degree**
+
+```{r}
+g_ad_cent %N>%
+  as_tibble() %>%
+  group_by(LEVEL)%>%
+  summarise(mean_eig= mean(cent_dgr_in))
+
+```
+We get the same conclusion using degree centrality
+
+```{r}
+g_f_cent %N>%
+  as_tibble() %>%
+  group_by(LEVEL)%>%
+  summarise(mean_eig= mean(cent_dgr_in))
+
+```
+Again we get that vice presidents are the most central friends on average.
 
 
 ## C Relational Characteristics: Answer the following questions:
 
 #### Are managers from the same 1. department, or on the same 2. hirarchy, 3. age, or 4. tenuere more likely to become friends or give advice? (hint: assortiativity related)
+
+We use the assortativity measure to assess this. This measure goes from -1 to 1, where a positive value indicates that the managers are more likely to become friends or give advice. A negative value indicates the opposite.
 
 **Are managers from the same department likely to become friends or give advice?**
 
@@ -313,7 +325,7 @@ We can see that people from the same level (hirarchy) are a little more likely t
 ##Friends
 assortativity(g_f, V(g_f)$LEVEL, directed = TRUE)
 ```
-We can see that people from the same level (hirarchy) are a little more likely to become friends.
+We can see that people from the same level (hierarchy) are more likely to become friends.
 
 **Are managers from the same age likely to become friends or give advice?**
 
@@ -335,13 +347,13 @@ We can see that people of the same age are a little more likely to become friend
 ##Advice
 assortativity(g_ad, V(g_ad)$TENURE, directed = TRUE)
 ```
-We see people who has the same tenuere are more likely to give each other advice
+We see people who have the same tenure are more likely to give each other advice
 
 ```{r}
 ##Friends
 assortativity(g_f, V(g_f)$TENURE, directed = TRUE)
 ```
-We see people who has the same tenuere are less likely to be friends with each other. 
+We see people who have the same tenure are a little less likely to be friends with each other. 
 
 
 #### Are friends more likely to give each others advice?
@@ -352,14 +364,14 @@ cor(edge_ad %>% pull(V3),
     edge_f %>% pull(V3))
 ```
 
-We now want to find the percentage of mutual friends who also give each other advice: 
+We now want to find the percentage of mutual friends who also give each other advice compared to people who are not mutual friends, but gives each other advice.
 
 ```{r}
 g_f_V2 <- g_f %E>% mutate(friends = which_mutual(g_f, es = E(g_f))) 
 
 g_f_V2 %E>% as.tibble() %>% count(friends)
 ```
-
+We create a graph object showing if the two nodes are mutual friends and merge them together with the advice network to see if they also give advice to each other.
 
 ```{r}
 graph <- g_f_V2 %E>% as_tibble() %>%
@@ -367,7 +379,9 @@ graph <- g_f_V2 %E>% as_tibble() %>%
   rename(to_friends= to.x, to_advice= to.y)
 ```
 
+We filter first with friends equal to false (not mutual friends) and then filter for people who have given each other advice.
 
+Afterwards we filter for friends equal to true and again for people who've given each other advice.
 
 ```{r}
 
@@ -385,24 +399,20 @@ filter(friends == TRUE) %>%
 
 ```
 
-
+We count the number of friends who gives each other advice and the amount of "not-friends" who gives each other advice.
 ```{r}
-
-#Number of friends who gives advice
 f=count(graph_f)
 
-#Numbber of not friends who gives advice
 nf=count(graph_nf)
 ```
 
+Now we count the amount of mutual friends and "not-friends".
 ```{r}
-#number of  people who are mutual friends 
 total_f=g_f_V2 %E>%
   as_tibble()%>%
   filter(friends == TRUE) %>%
   count()
 
-# Number of people who are not mutual friends
 
 total_nf=g_f_V2 %E>%
   as_tibble()%>%
@@ -410,21 +420,22 @@ total_nf=g_f_V2 %E>%
   count()
 ```
 
+
+Then we can calculate the percentage
 ```{r}
 f/total_f*100
 
 nf/total_nf*100
 ```
-We take the amount of mutual friends, so if ID 1 sees ID 2 as a friend and ID 2 sees ID 1 as friend. (This will count as 2 observations) We then look if people who are mutual friends also give advice to eacch other, if ID 1 gives advice to ID 2 this will give 1 observation, and vice versa. (So not mutualy).
+We take the amount of mutual friends, so if ID 1 sees ID 2 as a friend and ID 2 sees ID 1 as friend. (This will count as 2 observations) We then look if people who are mutual friends also give advice to each other. If ID 1 gives advice to ID 2 this will give 1 observation, and vice versa. (So not mutually).
 
-We then calculate the percantage of people who gives advice in a friendsship and outside a friendship. We see that it is almost the same so people who are friends are not more likely to give each others advice.
+We then calculate the percentage of people who gives advice in a friendship and outside a friendship. We see that it is almost the same so people who are friends are not more likely to give each others advice.
 
 # Visualizations
 
 We join the graphs
 
 ```{r}
-
 g_ad = g_ad %E>% mutate(type= "advice")
 g_f = g_f %E>% mutate(type= "friends")
 g_r = g_r %E>% mutate(type= "respons")
@@ -498,7 +509,7 @@ ce= as.numeric(eigen_centrality(g_f)$vector)
 
 Size= ce*3
 
-graphjs(g_f_cent, vertex.size = Size  , vertex.color= size_vector$LEVEL, bg= "pink")
+graphjs(g_f_cent, vertex.size = Size  , vertex.color= size_vector$LEVEL, bg= "beige", vertex.label = size_vector$ID)
 ```
 
 We can see that the nodes are colored by the LEVEL variable in the network. 
