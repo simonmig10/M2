@@ -501,7 +501,8 @@ g_ad %N>%
   facet_edges(~type)
 ```
 
-We can also do a 3D plot using the threejs package. Only able to see it when knitting to HTML but looks cool anyways
+We can also do a 3D plot using the threejs package. Only able to see it when knitting to HTML but looks cool locally. 
+So unfortunatly you cannot see the plot
 
 ```{r, click=list}
 
