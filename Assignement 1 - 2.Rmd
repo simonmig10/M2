@@ -14,7 +14,7 @@ library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
 library(magrittr) # For extra-piping operators (eg. %<>%)'
 library(threejs)
 library(tidygraph)
-library(ggraph)
+library(ggraph) 
 ```
 
 ```{r, message=FALSE}
