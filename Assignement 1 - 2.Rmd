@@ -3,8 +3,8 @@ title: "Assignment 1- 2"
 author: "Simon"
 date: "5/10/2021"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 always_allow_html: true
 ---
 
@@ -476,7 +476,8 @@ set.seed(1337)
 g_f %N>% 
   filter(!node_is_isolated()) %>%
   ggraph(layout = 'stress') + 
-  geom_edge_fan(arrow = arrow(angle = 30, length = unit(0.25, 'cm'),type = 'closed'), alpha = 0.25) + 
+  geom_edge_fan(arrow = arrow(angle = 30, 
+    length = unit(0.25, 'cm'),type = 'closed'), alpha = 0.25) + 
   geom_node_point(aes(col = LEVEL, size = centrality_eigen(directed = TRUE))) + 
   geom_node_text(aes(label = ID, size = centrality_eigen(directed = TRUE))) + 
   theme_graph(base_family="sans") +
@@ -491,7 +492,8 @@ set.seed(1337)
 g_ad %N>% 
   filter(!node_is_isolated()) %>%
   ggraph(layout = 'stress') + 
-  geom_edge_fan(arrow = arrow(angle = 30, length = unit(0.25, 'cm'),type = 'closed'), alpha = 0.25) + 
+  geom_edge_fan(arrow = arrow(angle = 30, 
+    length = unit(0.25, 'cm'),type = 'closed'), alpha = 0.25) + 
   geom_node_point(aes(col = LEVEL, size = centrality_eigen(directed = TRUE))) + 
   geom_node_text(aes(label = ID, size = centrality_eigen(directed = TRUE))) + 
   theme_graph(base_family="sans") +
@@ -509,7 +511,8 @@ ce= as.numeric(eigen_centrality(g_f)$vector)
 
 Size= ce*3
 
-graphjs(g_f_cent, vertex.size = Size  , vertex.color= size_vector$LEVEL, bg= "beige", vertex.label = size_vector$ID)
+graphjs(g_f_cent, vertex.size = Size  , vertex.color= size_vector$LEVEL, 
+        bg= "beige", vertex.label = size_vector$ID)
 ```
 
 We can see that the nodes are colored by the LEVEL variable in the network. 
