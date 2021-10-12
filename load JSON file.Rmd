@@ -50,6 +50,13 @@ download.file("https://github.com/SDS-AAU/SDS-master/raw/master/M2/data/pol_twee
 tweets_raw <- stream_in(gzfile(tmp, "pol_tweets"))
 ```
 
+```{r}
+# download and open some Trump tweets from trump_tweet_data_archive
+tmp1 <- tempfile()
+download.file("https://github.com/SDS-AAU/SDS-master/raw/master/M2/data/pres_debate_2020.gz", tmp1)
+
+tweets_raw1 <- stream_in(gzfile(tmp1, "pres_debate_2020"))
+```
 
 ```{r}
 tweets_raw %>% glimpse()
@@ -59,16 +66,43 @@ tweets_raw %>% glimpse()
 tweets <- tibble(ID = colnames(tweets_raw[[1]]), 
                  text = tweets_raw[[1]] %>% as.character(), 
                  labels = tweets_raw[[2]] %>% as.logical())
+tweets1 <- tibble(ID = colnames(tweets_raw1[[1]]), 
+                 text = tweets_raw1[[1]] %>% as.character(), 
+                 labels = tweets_raw1[[2]] %>% as.logical())
 #rm(tweets_raw)
 ```
 
 ```{r}
 tweets %>% glimpse()
+tweets1 %>% glimpse()
 ```
 
 ```{r}
 tweets %<>%
   filter(!(text %>% str_detect('^RT'))) # Filter retweets
+tweets1 %<>%
+  filter(!(text %>% str_detect('^RT'))) # Filter retweets
 ```
 
+
+#Tidying
+
+```{r}
+tweets_tidy = tweets %>% 
+  unnest_tokens(word, text, token = "tweets")
+```
+
+```{r}
+tweets_tidy %>%  head(50)
+```
+
+```{r}
+tweets_tidy %>% count(word, sort = TRUE)
+```
+
+# Preprocessing
+
+```{r}
+
+```
 
