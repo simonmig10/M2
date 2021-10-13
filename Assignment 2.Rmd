@@ -14,32 +14,41 @@ library(textrecipes)
 library(stopwords)
 library(tidytext)
 library(readr)
+library(SnowballC)
+library(textrecipes)
 ```
 
-```{r}
-
-```
 
 
 ```{r}
-data <- read_csv("https://raw.githubusercontent.com/simonmig10/M2-sds/main/twitter_hate_speech.csv")
+data_start <- read_csv("https://raw.githubusercontent.com/simonmig10/M2-sds/main/twitter_hate_speech.csv")
 
-data %>% as.tibble()
+data_start %>% as.tibble()
 ```
 ```{r}
-data %<>%
+data_start %<>%
   filter(!(tweet %>% str_detect('RT'))) %>% # Filter retweets
   rename(ID = X1)
 ```
 
 ```{r}
-data %>% glimpse()
-data %>% glimpse()
+data_start %>% glimpse()
+data_start %>% glimpse()
 ```
 ```{r}
-data <- tibble(ID = data[[1]] %>% as.numeric(), 
-                 text = data[[3]] %>% as.character(), 
-                 labels = data[[2]] %>% as.logical())
+data <- tibble(ID = data_start[[1]] %>% as.numeric(), 
+                 text = data_start[[3]] %>% as.character(), 
+                 labels = data_start[[2]] %>% as.logical())
+
+data_sml= tibble(ID = data_start[[1]] %>% as.numeric(), 
+                 text = data_start[[3]] %>% as.character(), 
+                 labels = data_start[[2]])
+
+data_sml_2 = data_sml %>%
+  mutate(labels= ifelse(labels== 0, "Hate", "not Hate"))
+
+data_sml_3 = data_sml %>%
+  mutate(labels= recode(labels, "0" = "Hate speech", "1" = "offensive", "2" = "niether"))
 
 #Sådan som det blev gjort på hans
 #data2 <- tibble(ID = colnames(data[[1]]),
@@ -182,5 +191,151 @@ labels_words %>%
   scale_x_reordered() +
   theme(axis.text.y = element_text(size = 6))
 ```
+
+
+
+# Build a machine learning model
+
+```{r}
+data_tidy %>% head()
+```
+
+# Predictive model
+
+```{r}
+library(tidymodels)
+```
+
+## Simple manual baseline
+
+```{r}
+words_classifier <- labels_words %>%
+  arrange(desc(tf_idf)) %>%
+  distinct(word, .keep_all = TRUE) %>%
+  select(-tf_idf)
+```
+
+
+```{r}
+tweet_null_model <- data_tidy %>%
+  inner_join(labels_words, by = 'word')
+```
+
+```{r}
+null_res <- tweet_null_model %>%
+  group_by(ID) %>%
+  summarise(truth = mean(labels.x, na.rm = TRUE) %>% round(0),
+         pred = mean(labels.y, na.rm = TRUE) %>% round(0))
+```
+```{r}
+table(null_res$truth, null_res$pred)
+```
+
+## Training & Test split
+
+```{r}
+data_sml_2 %<>%
+  select(-ID) %>%
+  rename(y = labels) %>%
+  mutate(y= y %>% as.factor())
+
+data_sml_3 %<>%
+  select(-ID) %>%
+  rename(y = labels) %>%
+  mutate(y= y %>% as.factor())
+```
+
+```{r}
+data_split <- initial_split(data_sml_2, prop = 0.75, strata = y)
+
+data_train <- data_split  %>%  training()
+data_test <- data_split %>% testing()
+```
+
+## Preprocessing pipeline
+
+
+```{r}
+# This recipe pretty much reconstructs all preprocessing we did so far
+data_recipe <- data_train %>%
+  recipe(y ~.) %>%
+  themis::step_downsample(y) %>% # For downsampling class imbalances (optimal)
+  step_filter(!(text %>% str_detect('^RT'))) %>% # Upfront filtering retweets
+  step_filter(text != "") %>%
+  step_tokenize(text, token = "tweets") %>% # tokenize
+  step_tokenfilter(text, min_times = 75) %>%  # Filter out rare words
+  step_stopwords(text, keep = FALSE) %>% # Filter stopwords
+  step_tfidf(text) %>% # TFIDF weighting
+  #step_pca(all_predictors()) %>% # Dimensionality reduction via PCA (optional)
+  prep() # NOTE: Only prep the recipe when not using in a workflow
+```
+```{r}
+data_recipe
+```
+```{r}
+data_train_prep <- data_recipe %>% juice()
+data_test_prep <- data_recipe %>% bake(data_test)
+```
+
+
+## Defining the models
+
+```{r}
+model_null <- null_model(mode = 'classification')
+```
+
+
+```{r}
+model_en <- logistic_reg(mode = 'classification', 
+                         mixture = 0.5, 
+                         penalty = 0.5) %>%
+  set_engine('glm', family = binomial) 
+```
+
+
+## Define the workflow
+
+We should make more models. 
+
+
+## fit the model
+
+
+```{r}
+fit_en <- model_en %>% fit(formula = y ~., data = data_train_prep)
+
+
+```
+
+
+```{r}
+pred_collected <- tibble(
+  truth = data_train_prep %>% pull(y),
+  pred = fit_en %>% predict(new_data = data_train_prep) %>% pull(.pred_class),
+  pred_prob = fit_en %>% predict(new_data = data_train_prep, type = "prob") %>% pull(`.pred_not Hate`),
+  ) 
+
+```
+
+```{r}
+pred_collected %>% conf_mat(truth, pred)
+```
+
+```{r}
+pred_collected %>% conf_mat(truth, pred) %>% summary()
+```
+One of my friends once wrote this on twitter and i want to find out if he made a hate speech. 
+Virker ik!
+```{r}
+# How would the model predict given some tweet text
+pred_own = tibble(text = 'hej med dig')
+```
+
+```{r}
+t=fit_en %>% predict(new_data = data_recipe %>% bake(pred_own))
+
+t$.pred_class
+```
+
 
 
