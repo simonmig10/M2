@@ -1,0 +1,23 @@
+---
+title: "Test"
+author: "Kristoffer Herrig Thorndal"
+date: "13/10/2021"
+output: html_document
+---
+
+```{r}
+### Load standardpackages
+library(readr)
+library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
+library(magrittr) # For extra-piping operators (eg. %<>%)
+library(tidytext)
+# download and open some Trump tweets from trump_tweet_data_archive
+library(jsonlite)
+
+tmp <- tempfile()
+download.file("https://github.com/SDS-AAU/SDS-master/raw/master/M2/data/twitter_hate.zip", tmp)
+#load data
+data <- stream_in(gzfile(tmp, "data"))
+data <- read_csv(tmp)
+data <- read_table("")
+```
