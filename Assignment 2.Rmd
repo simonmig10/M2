@@ -18,14 +18,15 @@ library(tidytext)
 
 ```
 
-
 ```{r}
 library(readr)
-twitter_hate_speech <- read_csv("C:/Users/Simon ik mig/AppData/Local/Temp/twitter_hate_speech_rDvACQ")
-View(twitter_hate_speech_rDvACQ)
+twitter_hate_speech <- read_csv("https://raw.githubusercontent.com/simonmig10/M2-sds/main/twitter_hate_speech.csv")
+View(twitter_hate_speech)
 
 twitter_hate_speech %>% as.tibble()
 
 ```
+
+
 
 
