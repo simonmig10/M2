@@ -10,19 +10,177 @@ output: html_document
 ### Load standardpackages
 library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
 library(magrittr) # For extra-piping operators (eg. %<>%)
-```
-
-```{r}
+library(textrecipes)
+library(stopwords)
 library(tidytext)
+library(readr)
+```
+
+```{r}
+
 ```
 
 
 ```{r}
-library(readr)
-twitter_hate_speech <- read_csv("C:/Users/Simon ik mig/AppData/Local/Temp/twitter_hate_speech_rDvACQ")
-View(twitter_hate_speech_rDvACQ)
+data <- read_csv("https://raw.githubusercontent.com/simonmig10/M2-sds/main/twitter_hate_speech.csv")
 
-twitter_hate_speech %>% as.tibble()
+data %>% as.tibble()
+```
+```{r}
+data %<>%
+  filter(!(tweet %>% str_detect('RT'))) %>% # Filter retweets
+  rename(ID = X1)
+```
+
+```{r}
+data %>% glimpse()
+data %>% glimpse()
+```
+```{r}
+data <- tibble(ID = data[[1]] %>% as.numeric(), 
+                 text = data[[3]] %>% as.character(), 
+                 labels = data[[2]] %>% as.logical())
+
+#Sådan som det blev gjort på hans
+#data2 <- tibble(ID = colnames(data[[1]]),
+               #text = data[[3]] %>% as.character(), 
+                 #labels = data[[2]] %>% as.logical())
+```
+
+```{r}
+data_tidy <- data %>%
+  unnest_tokens(word, text, token = "tweets") %>%
+  #text_tokens(word, stemmer = "en") %>%
+  mutate(word = wordStem(word))
+```
+
+```{r}
+data_tidy %>% head(50)
+```
+```{r}
+data_tidy %>% count(word, sort = TRUE)
+```
+# Preprocessing
+```{r}
+# preprocessing
+data_tidy %<>%
+  filter(!(word %>% str_detect('@'))) %>% # remove hashtags and mentions
+  filter(!(word %>% str_detect('^amp|^http|^t\\.co'))) %>% # Twitter specific stuff
+#  mutate(word = word %>% str_remove_all('[^[:alnum:]]')) %>% ## remove all special characters
+  filter(str_length(word) > 2 ) %>% # Remove words with less than  3 characters
+  group_by(word) %>%
+  filter(n() > 100) %>% # remove words occuring less than 100 times
+  ungroup() %>%
+  anti_join(stop_words, by = 'word') # remove stopwords
+```
+
+## TF IDF
+```{r}
+# top words
+data_tidy %>%
+  count(word, sort = TRUE) %>%
+  head(20)
+```
+```{r}
+# TFIDF weights
+data_tidy %<>%
+  add_count(ID, word) %>%
+  bind_tf_idf(term = word,
+              document = ID,
+              n = n)
+```
+
+```{r}
+# TFIDF topwords
+data_tidy %>%
+  count(word, wt = tf_idf, sort = TRUE) %>%
+  head(20)
+```
+# Dimensionality reduction
+## Creating a recipe
+```{r}
+recipe_base <- data %>%
+  select(ID, text) %>%
+  # BAse recipe starts
+  recipe(~.) %>% 
+  update_role(ID, new_role = "ID") %>% # Update role of ID
+  step_tokenize(text, token = 'words') %>% # tokenize
+  step_stopwords(text, keep = FALSE) %>% # remove stopwords
+  step_untokenize(text) %>% # Here we now have to first untokenize
+  step_tokenize(text, token = "ngrams", options = list(n = 1, n_min = 1)) %>% # and tokenize again
+  step_tokenfilter(text, min_times = 25) %>%
+  prep()
+
+recipe_pca <- recipe_base %>% # tokenize
+  step_tfidf(text, prefix = '') %>% # TFIDF weighting --> so different from the above. 
+  step_pca(all_predictors(), num_comp = 10) %>% # PCA
+  prep()
+
+#Plot 1
+recipe_pca %>% juice() %>%
+  ggplot(aes(x = PC01, y = PC02)) +
+  geom_point() 
+
+#Plot 2
+recipe_pca %>%
+  tidy(7) %>%
+  filter(component %in% paste0("PC", 1:4)) %>%
+  group_by(component) %>%
+    arrange(desc(value)) %>%
+    slice(c(1:2, (n()-2):n())) %>%
+  ungroup() %>%
+  mutate(component = fct_inorder(component)) %>%
+  ggplot(aes(value, terms, fill = terms)) +
+  geom_col(show.legend = TRUE) +
+  facet_wrap(~component, nrow = 1) +
+  labs(y = NULL)
+```
+
+
+```{r}
+data_tidy_ma = data_tidy  %>%
+  count(ID, word, sort = TRUE)
+
+data_tidy_ma %<>%
+  pivot_wider(names_from = word, values_from = n, values_fill = 0)
+
+
+
+text_pca <- data_tidy_ma %>% 
+  column_to_rownames('ID') %>%  # we change the id column to rownames so they dont get used in the dimention reduction. 
+  prcomp(center = TRUE, scale. = TRUE, rank. = 10)
+
+text_pca[['x']] %>%
+  head()
+
+text_pca %>%
+  tidy()
+
+
+```
+
+
+# Inspecting
+## Words by party affiliation
+
+```{r}
+labels_words <- data_tidy %>%
+  group_by(labels) %>%
+  count(word, wt = tf_idf, sort = TRUE, name = "tf_idf") %>%
+  slice(1:25) %>%
+  ungroup() 
+```
+
+```{r}
+labels_words %>%
+  mutate(word = reorder_within(word, by = tf_idf, within = labels)) %>%
+  ggplot(aes(x = word, y = tf_idf, fill = labels)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = NULL, y = "tf-idf") +
+  facet_wrap(~labels, ncol = 2, scales = "free") +
+  coord_flip() +
+  scale_x_reordered() +
+  theme(axis.text.y = element_text(size = 6))
 ```
 
 
