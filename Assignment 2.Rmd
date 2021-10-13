@@ -26,7 +26,6 @@ View(twitter_hate_speech_rDvACQ)
 
 twitter_hate_speech %>% as.tibble()
 
-
 ```
 
 
