@@ -5,62 +5,70 @@ date: "13/10/2021"
 output: html_document
 ---
 
-
-```{r}
+```{r, message=FALSE}
 ### Load standardpackages
 library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
 library(magrittr) # For extra-piping operators (eg. %<>%)
 library(textrecipes)
+library(recipes)
 library(stopwords)
 library(tidytext)
 library(readr)
+library(SnowballC)
+library(topicmodels)
 ```
 
-```{r}
-
-```
-
+Loader datasættet
 
 ```{r}
-data <- read_csv("https://raw.githubusercontent.com/simonmig10/M2-sds/main/twitter_hate_speech.csv")
+data <- read_csv("https://raw.githubusercontent.com/simonmig10/M2-sds/main/twitter_hate_speech.csv") %>% 
+  rename(X1 = ...1)
 
 data %>% as.tibble()
 ```
+# 1. Preprocessing
+
+Removing retweets and removing numbers from tweets.
 ```{r}
+data$tweet = data$tweet %>% 
+  str_remove_all("[0123456789]")
+
 data %<>%
-  filter(!(tweet %>% str_detect('RT'))) %>% # Filter retweets
+  filter(!(tweet %>% str_detect('RT')))  %>% 
   rename(ID = X1)
 ```
 
+Checking that retweets got removed
 ```{r}
 data %>% glimpse()
-data %>% glimpse()
 ```
+Converting data to a tibble so it can be tokenized
 ```{r}
 data <- tibble(ID = data[[1]] %>% as.numeric(), 
                  text = data[[3]] %>% as.character(), 
                  labels = data[[2]] %>% as.logical())
 
-#Sådan som det blev gjort på hans
-#data2 <- tibble(ID = colnames(data[[1]]),
-               #text = data[[3]] %>% as.character(), 
-                 #labels = data[[2]] %>% as.logical())
 ```
 
+tokenizing the data by tweets and stemming the words, so singular and plural words become the same.
 ```{r}
 data_tidy <- data %>%
-  unnest_tokens(word, text, token = "tweets") %>%
+  unnest_tokens(word, text, token = "tweets")
   #text_tokens(word, stemmer = "en") %>%
-  mutate(word = wordStem(word))
-```
+  
 
+```
+Checking whether it worked
 ```{r}
 data_tidy %>% head(50)
 ```
+It did, so now we count the words to check the most used words
 ```{r}
 data_tidy %>% count(word, sort = TRUE)
 ```
-# Preprocessing
+It shows that irrelevant words like "i" and "a" are commonly present, so these needs to be removed.
+
+Hashtags are being removed and so are other typical twitter specific stuff like http and so on. Words shorter than 3 letters are also removed and words occuring less than 100 times. Lastly the data is antijoined with stopwords and the tidying proces is done.
 ```{r}
 # preprocessing
 data_tidy %<>%
@@ -71,16 +79,16 @@ data_tidy %<>%
   group_by(word) %>%
   filter(n() > 100) %>% # remove words occuring less than 100 times
   ungroup() %>%
-  anti_join(stop_words, by = 'word') # remove stopwords
+  anti_join(stop_words, by = 'word') %>%  # remove stopwords
+  mutate(word = wordStem(word))
 ```
 
-## TF IDF
-```{r}
-# top words
-data_tidy %>%
-  count(word, sort = TRUE) %>%
-  head(20)
-```
+## TF IDF'
+
+The TF_IDF  score of each word is now being added to the tidied data. The TF-IDF (term frequency-inverse document frequency) is a measure that evaluates how relevant a word is to a document in a collection of documents.
+
+This is done by multiplying two metrics: how many times a word appears in a document, and the inverse document frequency of the word across a set of documents.
+
 ```{r}
 # TFIDF weights
 data_tidy %<>%
@@ -88,16 +96,21 @@ data_tidy %<>%
   bind_tf_idf(term = word,
               document = ID,
               n = n)
+
 ```
 
+Now the scores are showed.
 ```{r}
 # TFIDF topwords
 data_tidy %>%
   count(word, wt = tf_idf, sort = TRUE) %>%
-  head(20)
+  head(10)
 ```
-# Dimensionality reduction
-## Creating a recipe
+And here the ten words with the highest TF_IDF displayed.
+
+## Dimensionality reduction
+### Creating a recipe
+A recipe is created to dimensionality reduce the data and weighting them by TD-IDF scores.
 ```{r}
 recipe_base <- data %>%
   select(ID, text) %>%
@@ -135,33 +148,10 @@ recipe_pca %>%
   facet_wrap(~component, nrow = 1) +
   labs(y = NULL)
 ```
+These plots are not just awesome they also show how well some of the highest scored words are explained by each principal component.
 
-
-```{r}
-data_tidy_ma = data_tidy  %>%
-  count(ID, word, sort = TRUE)
-
-data_tidy_ma %<>%
-  pivot_wider(names_from = word, values_from = n, values_fill = 0)
-
-
-
-text_pca <- data_tidy_ma %>% 
-  column_to_rownames('ID') %>%  # we change the id column to rownames so they dont get used in the dimention reduction. 
-  prcomp(center = TRUE, scale. = TRUE, rank. = 10)
-
-text_pca[['x']] %>%
-  head()
-
-text_pca %>%
-  tidy()
-
-
-```
-
-
-# Inspecting
-## Words by party affiliation
+# 2. Explore and compare the 2 “classes of interest” - hate speech vs offensive language
+## Can you see differences by using simple count-based approaches?
 
 ```{r}
 labels_words <- data_tidy %>%
@@ -182,5 +172,92 @@ labels_words %>%
   scale_x_reordered() +
   theme(axis.text.y = element_text(size = 6))
 ```
+The result shows that the words with the highest TD-IDF score in the hate speech basket is "faggot", "fag" and "nigger" where as the words with the highest TD-IDF in the offensive language basket is "bitch", "hoe" and "pussi". This shows that hate speech is associated with racism and homophobia, where as offensive language is more cussing and bad mouthing.
 
+##Can you identify themes (aka clusters / topics) that are specific for one class or another?
 
+LDA-topic modelling is used to separate the dataset into topics for hate speech and offensive language respectively.
+
+First the tidy data is extracted and split into two datasets
+```{r}
+lda_data = data_tidy %>% 
+  select(ID, labels, word, n, tf_idf)
+
+off = lda_data %>% 
+  filter(labels == TRUE) %>% 
+  as.tibble()
+
+hate = lda_data %>% 
+  filter(labels == FALSE) %>% 
+  as.tibble()
+
+```
+
+Then the data is made into a document-term matrix
+```{r}
+text_dtm1 <- hate %>%
+  cast_dtm(document = ID, term = word, value = n)
+
+text_dtm2 <- off %>%
+  cast_dtm(document = ID, term = word, value = n)
+```
+
+The topics are created using the "Gibbs" method and there are only being created two topics for each category
+```{r}
+text_lda1 <- text_dtm1 %>% 
+  LDA(k = 2, method = "Gibbs",
+      control = list(seed = 1337))
+
+text_lda2 <- text_dtm2 %>% 
+  LDA(k = 2, method = "Gibbs",
+      control = list(seed = 1337))
+```
+
+We want the Beta parameter as i shows the probability that a word occurs in a certain topic.
+Therefore, looking at the top probability words of a topic often gives us a good intuition regarding its properties, which is done in two plots below.
+```{r}
+lda_beta1 <- text_lda1 %>% 
+  tidy(matrix = "beta")
+
+lda_beta2 <- text_lda2 %>% 
+  tidy(matrix = "beta")
+
+lda_beta1 %>%
+  # slice
+  group_by(topic) %>%
+  arrange(topic, desc(beta)) %>%
+  slice(1:5) %>%
+  ungroup() %>%
+  # visualize
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  group_by(topic, term) %>%    
+  arrange(desc(beta)) %>%  
+  ungroup() %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(title = "Top 5 terms in hate speech for each topic",
+       x = NULL, y = expression(beta)) +
+  facet_wrap(~ topic, ncol = 3, scales = "free")
+
+lda_beta2 %>%
+  # slice
+  group_by(topic) %>%
+  arrange(topic, desc(beta)) %>%
+  slice(1:5) %>%
+  ungroup() %>%
+  # visualize
+  mutate(term = reorder_within(term, beta, topic)) %>%
+  group_by(topic, term) %>%    
+  arrange(desc(beta)) %>%  
+  ungroup() %>%
+  ggplot(aes(term, beta, fill = as.factor(topic))) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_x_reordered() +
+  labs(title = "Top 5 terms in offensive language for each topic",
+       x = NULL, y = expression(beta)) +
+  facet_wrap(~ topic, ncol = 3, scales = "free")
+```
+The two above plots kinda shows a similar picture as the one showcased earlier. It seems like the two topics are not separated by any particular measure such as racism and homophobia in the case of hate speech nor seems the topic in offensive language to be separated by anything specific. 
