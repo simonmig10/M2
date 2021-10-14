@@ -274,17 +274,15 @@ The two above plots kinda shows a similar picture as the one showcased earlier. 
 
 # 3. Build an ML model that can predict hate speech
 
-```{r}
-data_tidy %>% head()
-```
-
-# Predictive model
+We want to use the tidymodels package to build the models. 
 
 ```{r}
 library(tidymodels)
 ```
 
 ## Simple manual baseline
+
+We create a mean model. 
 
 ```{r}
 words_classifier <- labels_words %>%
@@ -311,7 +309,11 @@ null_res <- tweet_null_model %>%
 table(null_res$truth, null_res$pred)
 ```
 
+We can see the model is very bad at predicting hate speech, with 0 beeing hate speech and 1 beeing offensive language. 
+
 ## Training & Test split
+
+We create a training and test dataset
 
 ```{r}
 data_sml_2 %<>%
@@ -336,6 +338,7 @@ data_test <- data_split %>% testing()
 
 ## Preprocessing pipeline
 
+We create a recipe for a model with and without dimensionality reduction.
 
 ```{r, warning=FALSE}
 # This recipe pretty much reconstructs all preprocessing we did so far
@@ -369,7 +372,7 @@ data_recipe_pca <- data_train %>%
 
 ```
 
-
+We run the recipies on the trainging and test data. 
 ```{r}
 data_train_prep <- data_recipe %>% juice()
 data_test_prep <- data_recipe %>% bake(data_test)
@@ -381,18 +384,15 @@ data_test_prep_pca <- data_recipe_pca %>% bake(data_test)
 
 ## Defining the models
 
-### Mean model 
-
-```{r}
-model_null <- null_model(mode = 'classification')
-```
+We create the models we want to test including an Elastic net model, random forest model and K-nearest neighbor model
 
 ### Elastic net model
 
+
 ```{r}
 model_en <- logistic_reg(mode = 'classification', 
-                         mixture = tune(), 
-                         penalty = tune()) %>%
+                         mixture = 0.5, 
+                         penalty = 0.5) %>%
   set_engine('glm', family = binomial) 
 ```
 
@@ -419,6 +419,7 @@ model_knn <-
 
 ## fit the model
 
+We fit the models using both the training data for pca and not pca. 
 
 ```{r}
 fit_en <- model_en %>% fit(formula = y ~., data = data_train_prep)
@@ -436,6 +437,8 @@ fit_knn_pca <- model_knn %>% fit(formula = y ~., data = data_train_prep_pca)
 fit_rf_pca <- model_rf %>% fit(formula = y ~., data = data_train_prep_pca)
 
 ```
+
+We now want to pull the predictions from the fitted models and compare with the true label of each tweet. 
 
 
 ```{r}
@@ -478,6 +481,8 @@ pred_collected_rf_pca <- tibble(
   ) 
 ```
 
+
+We can compare them using a confusionmatrix. 
 ```{r}
 pred_collected_en %>% conf_mat(truth, pred)
 
@@ -494,7 +499,7 @@ pred_collected_rf_pca %>% conf_mat(truth, pred)
 pred_collected_knn_pca %>% conf_mat(truth, pred)
 ```
 
-
+We can also look at the different measures of each of the model. 
 ```{r}
 pred_collected_en %>% conf_mat(truth, pred) %>% summary()
 
@@ -511,9 +516,12 @@ pred_collected_rf_pca %>% conf_mat(truth, pred) %>% summary()
 
 pred_collected_knn_pca %>% conf_mat(truth, pred) %>% summary()
 ```
+We can see the best model is the Random forest model looking at the accuracy measure, where we get a measure of 0.8604924. 
+
 
 ## on test data
 
+We now do the same predictions using the test data. 
 
 ```{r}
 pred_collected_en_test <- tibble(
@@ -556,6 +564,7 @@ pred_collected_rf_test_pca <- tibble(
   )
 ```
 
+We again create confusion matrix for each model. 
 
 ```{r}
 pred_collected_en_test %>% conf_mat(truth, pred)
@@ -574,6 +583,7 @@ pred_collected_knn_test_pca %>% conf_mat(truth, pred)
 pred_collected_rf_test_pca %>% conf_mat(truth, pred)
 ```
 
+We can again look at the different measures of the models. 
 
 ```{r}
 pred_collected_en_test %>% conf_mat(truth, pred) %>% summary()
@@ -591,4 +601,4 @@ pred_collected_knn_test_pca %>% conf_mat(truth, pred) %>% summary()
 
 pred_collected_rf_test_pca %>% conf_mat(truth, pred) %>% summary()
 ```
-
+On the testing data we see the best model is the elastic net model when looking at the accuracy measure.. 
