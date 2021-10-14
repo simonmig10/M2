@@ -272,7 +272,7 @@ lda_beta2 %>%
 The two above plots kinda shows a similar picture as the one showcased earlier. It seems like the two topics are not separated by any particular measure such as racism and homophobia in the case of hate speech nor seems the topic in offensive language to be separated by anything specific. 
 
 
-# Build a machine learning model
+# 3. Build an ML model that can predict hate speech
 
 ```{r}
 data_tidy %>% head()
@@ -337,7 +337,7 @@ data_test <- data_split %>% testing()
 ## Preprocessing pipeline
 
 
-```{r}
+```{r, warning=FALSE}
 # This recipe pretty much reconstructs all preprocessing we did so far
 data_recipe <- data_train %>%
   recipe(y ~.) %>%
@@ -353,7 +353,7 @@ data_recipe <- data_train %>%
 ```
 
 
-```{r}
+```{r, warning= FALSE}
 # This recipe pretty much reconstructs all preprocessing we did so far
 data_recipe_pca <- data_train %>%
   recipe(y ~.) %>%
