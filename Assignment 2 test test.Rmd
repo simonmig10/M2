@@ -2,7 +2,9 @@
 title: "Assignment 2"
 author: "Simon"
 date: "13/10/2021"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 
@@ -35,8 +37,8 @@ data_start$tweet = data_start$tweet %>%
   str_remove_all("[0123456789]")
 
 data_start %<>%
-  filter(!(tweet %>% str_detect('RT')))  %>% 
-  rename(ID = X1)
+  filter(!(tweet %>% str_detect('RT')))  ##%>% 
+  ##rename(ID = X1)
 ```
 
 Checking that retweets got removed
