@@ -177,7 +177,7 @@ labels_words %>%
 ```
 The result shows that the words with the highest TD-IDF score in the hate speech basket is "faggot", "fag" and "nigger" where as the words with the highest TD-IDF in the offensive language basket is "bitch", "hoe" and "pussi". This shows that hate speech is associated with racism and homophobia, where as offensive language is more cussing and bad mouthing.
 
-##Can you identify themes (aka clusters / topics) that are specific for one class or another?
+##  you identify themes (aka clusters / topics) that are specific for one class or another?
 
 LDA-topic modelling is used to separate the dataset into topics for hate speech and offensive language respectively.
 
@@ -263,5 +263,5 @@ lda_beta2 %>%
        x = NULL, y = expression(beta)) +
   facet_wrap(~ topic, ncol = 3, scales = "free")
 ```
-The two above plots kinda shows a similar picture as the one showcased earlier. It seems like the two topics are not separated by any particular measure such as racism and homophobia in the case of hate speech nor seems the topic in offensive language to be separated
+The two above plots kinda shows a similar picture as the one showcased earlier. It seems like the two topics are not separated by any particular measure such as racism and homophobia in the case of hate speech nor seems the topic in offensive language to be separated by anything specific. 
 
