@@ -1,0 +1,17 @@
+---
+title: "Test eksamen m2"
+author: "Kristoffer Herrig Thorndal"
+date: "25/10/2021"
+output: html_document
+---
+
+```{r}
+install.packages("rtweet")
+library(rtweet)
+```
+
+```{r}
+## search for 18000 tweets using the rstats hashtag
+rt <- search_tweets("#rstats", n = 18000, include_rts = FALSE)
+```
+
