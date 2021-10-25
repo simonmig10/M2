@@ -4,14 +4,21 @@ author: "Kristoffer Herrig Thorndal"
 date: "25/10/2021"
 output: html_document
 ---
+```{r}
+### Load standardpackages
+library(readr)
+library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
+library(magrittr) # For extra-piping operators (eg. %<>%)
+library(tidytext)
+library(textdata)
+```
 
 ```{r}
-install.packages("rtweet")
 library(rtweet)
 ```
 
 ```{r}
 ## search for 18000 tweets using the rstats hashtag
-rt <- search_tweets("#rstats", n = 18000, include_rts = FALSE)
+rt <- search_tweets("MUNLIV", language = "en", n = 18000, include_rts = FALSE)
 ```
 
