@@ -1,0 +1,71 @@
+---
+title: "Test"
+author: "Kristoffer Herrig Thorndal"
+date: "13/10/2021"
+output: html_document
+---
+
+```{r}
+### Load standardpackages
+library(readr)
+library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
+library(magrittr) # For extra-piping operators (eg. %<>%)
+library(tidytext)
+# download and open some Trump tweets from trump_tweet_data_archive
+library(jsonlite)
+
+
+#load data
+data <- read.csv("~/Desktop/7. semester/SDS/M2-SDS/CJF.csv", comment.char="#")
+```
+
+```{r}
+data %>%
+  mutate(text = paste(title, Job.Description, sep = " ")) %>%
+  select(Job.ID, text)
+```
+
+```{r}
+
+```
+
+
+```{r}
+text_tidy = data %>% unnest_tokens(word, text, token = "words")
+```
+
+```{r}
+library(textdata)
+
+glove6b = embedding_glove6b(dimensions = 100)
+```
+
+```{r}
+text_tidy_embed = text_tidy %>%
+  inner_join(glove6b, by = c("word" = "token"))
+```
+
+```{r}
+text_tidy %>%
+  anti_join(stop_word) %>%
+  count(word, sort = TRUE)
+```
+
+```{r}
+text_tidy_embed_small = text_tidy_embed(1:100000,)
+```
+
+
+```{r}
+#text_tidy_embed %>%
+ # select(-word) %>%
+ # group_by(job_id) %>%
+#  summarise_all(mean = mean())
+
+text_tidy_embed_small %>%
+  group_by(job_id) %>%
+  summarise(across(where(is.numeric(), - mean(.x, na.rm = TRUE)))) # eller er det lig med i stedet for minus?
+```
+
+
+
