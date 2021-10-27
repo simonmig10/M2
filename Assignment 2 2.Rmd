@@ -1,0 +1,523 @@
+---
+title: "Assignment 2"
+author: "Simon"
+date: "13/10/2021"
+output: html_document
+---
+
+
+```{r}
+### Load standardpackages
+library(tidyverse) # Collection of all the good stuff like dplyr, ggplot2 ect.
+library(magrittr) # For extra-piping operators (eg. %<>%)
+library(textrecipes)
+library(stopwords)
+library(tidytext)
+library(readr)
+library(SnowballC)
+library(textrecipes)
+```
+
+
+
+```{r}
+data_start <- read_csv("https://raw.githubusercontent.com/simonmig10/M2-sds/main/twitter_hate_speech.csv")
+
+data_start %>% as.tibble()
+```
+```{r}
+data_start %<>%
+  filter(!(tweet %>% str_detect('RT'))) %>% # Filter retweets
+  rename(ID = X1)
+```
+
+```{r}
+data_start %>% glimpse()
+data_start %>% glimpse()
+```
+```{r}
+data <- tibble(ID = data_start[[1]] %>% as.numeric(), 
+                 text = data_start[[3]] %>% as.character(), 
+                 labels = data_start[[2]] %>% as.logical())
+
+data_sml= tibble(ID = data_start[[1]] %>% as.numeric(), 
+                 text = data_start[[3]] %>% as.character(), 
+                 labels = data_start[[2]])
+
+data_sml_2 = data_sml %>%
+  filter(labels %in% c(0,1))%>%
+  mutate(labels= ifelse(labels== 0, "Hate", "offens"))
+
+data_sml_3 = data_sml %>%
+  mutate(labels= recode(labels, "0" = "Hate speech", "1" = "offensive", "2" = "niether"))
+
+#Sådan som det blev gjort på hans
+#data2 <- tibble(ID = colnames(data[[1]]),
+               #text = data[[3]] %>% as.character(), 
+                 #labels = data[[2]] %>% as.logical())
+```
+
+```{r}
+data_tidy <- data %>%
+  unnest_tokens(word, text, token = "tweets") %>%
+  #text_tokens(word, stemmer = "en") %>%
+  mutate(word = wordStem(word))
+```
+
+```{r}
+data_tidy %>% head(50)
+```
+```{r}
+data_tidy %>% count(word, sort = TRUE)
+```
+# Preprocessing
+```{r}
+# preprocessing
+data_tidy %<>%
+  filter(!(word %>% str_detect('@'))) %>% # remove hashtags and mentions
+  filter(!(word %>% str_detect('^amp|^http|^t\\.co'))) %>% # Twitter specific stuff
+#  mutate(word = word %>% str_remove_all('[^[:alnum:]]')) %>% ## remove all special characters
+  filter(str_length(word) > 2 ) %>% # Remove words with less than  3 characters
+  group_by(word) %>%
+  filter(n() > 100) %>% # remove words occuring less than 100 times
+  ungroup() %>%
+  anti_join(stop_words, by = 'word') # remove stopwords
+```
+
+## TF IDF
+```{r}
+# top words
+data_tidy %>%
+  count(word, sort = TRUE) %>%
+  head(20)
+```
+
+
+
+```{r}
+# TFIDF weights
+data_tidy %<>%
+  add_count(ID, word) %>%
+  bind_tf_idf(term = word,
+              document = ID,
+              n = n)
+```
+
+```{r}
+# TFIDF topwords
+data_tidy %>%
+  count(word, wt = tf_idf, sort = TRUE) %>%
+  head(20)
+```
+# Dimensionality reduction
+## Creating a recipe
+```{r}
+recipe_base <- data %>%
+  select(ID, text) %>%
+  # BAse recipe starts
+  recipe(~.) %>% 
+  update_role(ID, new_role = "ID") %>% # Update role of ID
+  step_tokenize(text, token = 'words') %>% # tokenize
+  step_stopwords(text, keep = FALSE) %>% # remove stopwords
+  step_untokenize(text) %>% # Here we now have to first untokenize
+  step_tokenize(text, token = "ngrams", options = list(n = 1, n_min = 1)) %>% # and tokenize again
+  step_tokenfilter(text, min_times = 25) %>%
+  prep()
+
+recipe_pca <- recipe_base %>% # tokenize
+  step_tfidf(text, prefix = '') %>% # TFIDF weighting --> so different from the above. 
+  step_pca(all_predictors(), num_comp = 10) %>% # PCA
+  prep()
+
+#Plot 1
+recipe_pca %>% juice() %>%
+  ggplot(aes(x = PC01, y = PC02)) +
+  geom_point() 
+
+#Plot 2
+recipe_pca %>%
+  tidy(7) %>%
+  filter(component %in% paste0("PC", 1:4)) %>%
+  group_by(component) %>%
+    arrange(desc(value)) %>%
+    slice(c(1:2, (n()-2):n())) %>%
+  ungroup() %>%
+  mutate(component = fct_inorder(component)) %>%
+  ggplot(aes(value, terms, fill = terms)) +
+  geom_col(show.legend = TRUE) +
+  facet_wrap(~component, nrow = 1) +
+  labs(y = NULL)
+```
+
+
+```{r}
+data_tidy_ma = data_tidy  %>%
+  count(ID, word, sort = TRUE)
+
+data_tidy_ma %<>%
+  pivot_wider(names_from = word, values_from = n, values_fill = 0)
+
+
+
+text_pca <- data_tidy_ma %>% 
+  column_to_rownames('ID') %>%  # we change the id column to rownames so they dont get used in the dimention reduction. 
+  prcomp(center = TRUE, scale. = TRUE, rank. = 10)
+
+text_pca[['x']] %>%
+  head()
+
+text_pca %>%
+  tidy()
+
+
+```
+
+
+# Inspecting
+## Words by party affiliation
+
+```{r}
+labels_words <- data_tidy %>%
+  group_by(labels) %>%
+  count(word, wt = tf_idf, sort = TRUE, name = "tf_idf") %>%
+  slice(1:25) %>%
+  ungroup() 
+```
+
+```{r}
+labels_words %>%
+  mutate(word = reorder_within(word, by = tf_idf, within = labels)) %>%
+  ggplot(aes(x = word, y = tf_idf, fill = labels)) +
+  geom_col(show.legend = FALSE) +
+  labs(x = NULL, y = "tf-idf") +
+  facet_wrap(~labels, ncol = 2, scales = "free") +
+  coord_flip() +
+  scale_x_reordered() +
+  theme(axis.text.y = element_text(size = 6))
+```
+
+
+
+# Build a machine learning model
+
+```{r}
+data_tidy %>% head()
+```
+
+# Predictive model
+
+```{r}
+library(tidymodels)
+```
+
+## Simple manual baseline
+
+```{r}
+words_classifier <- labels_words %>%
+  arrange(desc(tf_idf)) %>%
+  distinct(word, .keep_all = TRUE) %>%
+  select(-tf_idf)
+```
+
+
+```{r}
+tweet_null_model <- data_tidy %>%
+  inner_join(labels_words, by = 'word')
+```
+
+```{r}
+null_res <- tweet_null_model %>%
+  group_by(ID) %>%
+  summarise(truth = mean(labels.x, na.rm = TRUE) %>% round(0),
+         pred = mean(labels.y, na.rm = TRUE) %>% round(0))
+```
+
+
+```{r}
+table(null_res$truth, null_res$pred)
+```
+
+## Training & Test split
+
+```{r}
+data_sml_2 %<>%
+  #filter(!(text %>% str_detect('@'))) %>% # remove hashtags and mentions
+  #filter(!(text %>% str_detect('^amp|^http|^t\\.co'))) %>% # Twitter specific stuff
+  select(-ID) %>%
+  rename(y = labels) %>%
+  mutate(y= y %>% as.factor())
+```
+
+```{r}
+
+data_split_test= initial_split(data_sml_2, prop = 0.75, strata = y)
+
+
+
+data_split <- initial_split(data_sml_2, prop = 0.75, strata = y)
+
+data_train <- data_split  %>%  training()
+data_test <- data_split %>% testing()
+```
+
+## Preprocessing pipeline
+
+
+```{r}
+# This recipe pretty much reconstructs all preprocessing we did so far
+data_recipe <- data_train %>%
+  recipe(y ~.) %>%
+  themis::step_downsample(y) %>% # For downsampling class imbalances (optimal)
+  step_filter(!(text %>% str_detect('^RT'))) %>% # Upfront filtering retweets
+  step_filter(text != "@") %>%
+  step_tokenize(text, token = "tweets") %>% # tokenize
+  step_tokenfilter(text, min_times = 75) %>%  # Filter out rare words
+  step_stopwords(text, keep = FALSE) %>% # Filter stopwords
+  step_tfidf(text) %>% # TFIDF weighting
+  #step_pca(all_predictors()) %>% # Dimensionality reduction via PCA (optional)
+  prep() # NOTE: Only prep the recipe when not using in a workflow
+```
+
+
+```{r}
+# This recipe pretty much reconstructs all preprocessing we did so far
+data_recipe_pca <- data_train %>%
+  recipe(y ~.) %>%
+  themis::step_downsample(y) %>% # For downsampling class imbalances (optimal)
+  step_filter(!(text %>% str_detect('^RT'))) %>% # Upfront filtering retweets
+  step_filter(text != "") %>%
+  step_tokenize(text, token = "tweets") %>% # tokenize
+  step_tokenfilter(text, min_times = 75) %>%  # Filter out rare words
+  step_stopwords(text, keep = FALSE) %>% # Filter stopwords
+  step_tfidf(text) %>% # TFIDF weighting
+  step_pca(all_predictors()) %>% # Dimensionality reduction via PCA (optional)
+  prep() # NOTE: Only prep the recipe when not using in a workflow
+
+```
+
+```{r}
+data_recipe
+```
+
+
+```{r}
+data_train_prep <- data_recipe %>% juice()
+data_test_prep <- data_recipe %>% bake(data_test)
+
+data_train_prep_pca <- data_recipe_pca %>% juice()
+data_test_prep_pca <- data_recipe_pca %>% bake(data_test)
+```
+
+
+## Defining the models
+
+### Mean model 
+
+```{r}
+model_null <- null_model(mode = 'classification')
+```
+
+### Elastic net model
+
+```{r}
+model_en <- logistic_reg(mode = 'classification', 
+                         mixture = tune(), 
+                         penalty = tune()) %>%
+  set_engine('glm', family = binomial) 
+```
+
+
+### Random forrest model
+
+```{r}
+model_rf <- 
+  rand_forest() %>% 
+  set_engine("ranger", importance = "impurity") %>% 
+  set_mode("classification")
+
+```
+
+### K-nearest neighbor model
+
+```{r}
+model_knn <- 
+  nearest_neighbor(neighbors = 4) %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification") 
+```
+
+
+## fit the model
+
+
+```{r}
+fit_en <- model_en %>% fit(formula = y ~., data = data_train_prep)
+
+fit_knn <- model_knn %>% fit(formula = y ~., data = data_train_prep)
+
+fit_rf <- model_rf %>% fit(formula = y ~., data = data_train_prep)
+
+
+##PCA
+fit_en_pca <- model_en %>% fit(formula = y ~., data = data_train_prep_pca)
+
+fit_knn_pca <- model_knn %>% fit(formula = y ~., data = data_train_prep_pca)
+
+fit_rf_pca <- model_rf %>% fit(formula = y ~., data = data_train_prep_pca)
+
+```
+
+
+```{r}
+pred_collected_en <- tibble(
+  truth = data_train_prep %>% pull(y),
+  pred = fit_en %>% predict(new_data = data_train_prep) %>% pull(.pred_class),
+  pred_prob = fit_en %>% predict(new_data = data_train_prep, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+pred_collected_knn <- tibble(
+  truth = data_train_prep %>% pull(y),
+  pred = fit_knn %>% predict(new_data = data_train_prep) %>% pull(.pred_class),
+  pred_prob = fit_knn %>% predict(new_data = data_train_prep, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+pred_collected_rf <- tibble(
+  truth = data_train_prep %>% pull(y),
+  pred = fit_rf %>% predict(new_data = data_train_prep) %>% pull(.pred_class),
+  pred_prob = fit_rf %>% predict(new_data = data_train_prep, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+
+###PCA
+pred_collected_en_pca <- tibble(
+  truth = data_train_prep_pca %>% pull(y),
+  pred = fit_en_pca %>% predict(new_data = data_train_prep_pca) %>% pull(.pred_class),
+  pred_prob = fit_en_pca %>% predict(new_data = data_train_prep_pca, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+pred_collected_knn_pca <- tibble(
+  truth = data_train_prep_pca %>% pull(y),
+  pred = fit_knn_pca %>% predict(new_data = data_train_prep_pca) %>% pull(.pred_class),
+  pred_prob = fit_knn_pca %>% predict(new_data = data_train_prep_pca, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+pred_collected_rf_pca <- tibble(
+  truth = data_train_prep_pca %>% pull(y),
+  pred = fit_rf_pca %>% predict(new_data = data_train_prep_pca) %>% pull(.pred_class),
+  pred_prob = fit_rf_pca %>% predict(new_data = data_train_prep_pca, type = "prob") %>% pull(.pred_offens),
+  ) 
+```
+
+```{r}
+pred_collected_en %>% conf_mat(truth, pred)
+
+pred_collected_rf %>% conf_mat(truth, pred)
+
+pred_collected_knn %>% conf_mat(truth, pred)
+
+
+###PCA
+pred_collected_en_pca %>% conf_mat(truth, pred)
+
+pred_collected_rf_pca %>% conf_mat(truth, pred)
+
+pred_collected_knn_pca %>% conf_mat(truth, pred)
+```
+
+
+```{r}
+pred_collected_en %>% conf_mat(truth, pred) %>% summary()
+
+pred_collected_rf %>% conf_mat(truth, pred) %>% summary()
+
+pred_collected_knn %>% conf_mat(truth, pred) %>% summary()
+
+
+##PCA
+
+pred_collected_en_pca %>% conf_mat(truth, pred) %>% summary()
+
+pred_collected_rf_pca %>% conf_mat(truth, pred) %>% summary()
+
+pred_collected_knn_pca %>% conf_mat(truth, pred) %>% summary()
+```
+
+## on test data
+
+
+```{r}
+pred_collected_en_test <- tibble(
+  truth = data_test_prep %>% pull(y),
+  pred = fit_en %>% predict(new_data = data_test_prep) %>% pull(.pred_class),
+  pred_prob = fit_en %>% predict(new_data = data_test_prep, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+pred_collected_knn_test <- tibble(
+  truth = data_test_prep %>% pull(y),
+  pred = fit_knn %>% predict(new_data = data_test_prep) %>% pull(.pred_class),
+  pred_prob = fit_knn %>% predict(new_data = data_test_prep, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+pred_collected_rf_test <- tibble(
+  truth = data_test_prep %>% pull(y),
+  pred = fit_rf %>% predict(new_data = data_test_prep) %>% pull(.pred_class),
+  pred_prob = fit_rf %>% predict(new_data = data_test_prep, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+
+##PCA
+
+pred_collected_en_test_pca <- tibble(
+  truth = data_test_prep_pca %>% pull(y),
+  pred = fit_en_pca %>% predict(new_data = data_test_prep_pca) %>% pull(.pred_class),
+  pred_prob = fit_en_pca %>% predict(new_data = data_test_prep_pca, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+pred_collected_knn_test_pca <- tibble(
+  truth = data_test_prep_pca %>% pull(y),
+  pred = fit_knn_pca %>% predict(new_data = data_test_prep_pca) %>% pull(.pred_class),
+  pred_prob = fit_knn_pca %>% predict(new_data = data_test_prep_pca, type = "prob") %>% pull(.pred_offens),
+  ) 
+
+pred_collected_rf_test_pca <- tibble(
+  truth = data_test_prep_pca %>% pull(y),
+  pred = fit_rf_pca %>% predict(new_data = data_test_prep_pca) %>% pull(.pred_class),
+  pred_prob = fit_rf_pca %>% predict(new_data = data_test_prep_pca, type = "prob") %>% pull(.pred_offens),
+  )
+```
+
+
+```{r}
+pred_collected_en_test %>% conf_mat(truth, pred)
+
+pred_collected_rf_test %>% conf_mat(truth, pred)
+
+pred_collected_knn_test %>% conf_mat(truth, pred)
+
+
+##PCA
+
+pred_collected_en_test_pca %>% conf_mat(truth, pred)
+
+pred_collected_knn_test_pca %>% conf_mat(truth, pred)
+
+pred_collected_rf_test_pca %>% conf_mat(truth, pred)
+```
+
+
+```{r}
+pred_collected_en_test %>% conf_mat(truth, pred) %>% summary()
+
+pred_collected_rf_test %>% conf_mat(truth, pred) %>% summary()
+
+pred_collected_knn_test %>% conf_mat(truth, pred) %>% summary()
+
+
+##PCA
+
+pred_collected_en_test_pca %>% conf_mat(truth, pred) %>% summary()
+
+pred_collected_knn_test_pca %>% conf_mat(truth, pred) %>% summary()
+
+pred_collected_rf_test_pca %>% conf_mat(truth, pred) %>% summary()
+```
