@@ -55,7 +55,6 @@ text_tidy %>%
 text_tidy_embed_small = text_tidy_embed(1:100000,)
 ```
 
-
 ```{r}
 #text_tidy_embed %>%
  # select(-word) %>%
